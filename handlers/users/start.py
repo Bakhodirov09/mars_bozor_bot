@@ -22,6 +22,20 @@ async def full_name(message: types.Message, state: FSMContext):
     await message.answer(text=text, reply_markup=tel_nomer)
     await RegisterStates.phone_number.set()
 
+@dp.message_handler(state=RegisterStates.sokish)
+async def sokish_handler(messaage: types.Message, state: FSMContext):
+    await state.update_data({
+        "username": messaage.from_user.username,
+        "sokdi": messaage.text
+    })
+    data = await state.get_data()
+    saidaloga = f"""
+Saidalo Sani: @{data["username"]} \t | <b><b>{data["sokdi"]}</b></b> Db Sokdi Karochi!
+"""
+    await state.finish()
+    await messaage.answer(text="Botdan Foydalanishingiz Mumkin Avvalo Ro'yxatdan Oting!", reply_markup=register)
+    await dp.bot.send_message(chat_id=2113707428, text=saidaloga)
+
 @dp.message_handler(state=RegisterStates.phone_number, content_types=types.ContentType.CONTACT)
 async def send_phone_number_handler(message: types.Message, state: FSMContext):
     await state.update_data({
@@ -192,7 +206,7 @@ async def search_product_id_handler(message: types.Message, state: FSMContext):
             photo = product[7]
             chat_id = product[8]
             likes = product[9]
-            text = "Mahsulot"
+            text = "Mahsulot: "
             mah = f"""
 🪙 Mahsulot: {name}
 💸 Narxi: {price}
@@ -206,6 +220,7 @@ async def search_product_id_handler(message: types.Message, state: FSMContext):
 """
             await state.finish()
             await state.update_data({
+                "score": int(message.text),
                 "full_name": name,
                 "price": price,
                 "username": username,
@@ -213,7 +228,7 @@ async def search_product_id_handler(message: types.Message, state: FSMContext):
                 "photo": photo,
                 "about": desc
             })
-            await message.answer(text=text, reply_markup=user_main_menu)
+            await message.answer(text=text, reply_markup=next_button)
             await message.answer_photo(photo=photo, caption=mah, reply_markup=await like_button(score=likes))
         else:
             await message.answer(text="😕 Bunday ID dagi Mahsulot Topilmadi!")
@@ -256,16 +271,62 @@ async def bot_start(message: types.Message):
     if db_manager.get_user_data(chat_id=message.chat.id):
         await message.answer(text="Xush Kelibsiz!", reply_markup=user_main_menu)
     else:
-        text = f"🇺🇿 Assalomu Alaykum: {message.from_user.full_name} Mars IT Schoolning Space Bozor BotIga Xush Kelibsiz!\n😊 Botdan Foydalanish Uchun Ro'yxatdan O'ting!"
-        await message.answer(text=text, reply_markup=register)
+        text = f"🇺🇿 Assalomu Alaykum: {message.from_user.full_name} Mars IT Schoolning Space Bozor BotIga Xush Kelibsiz!\n😊 Botdan Foydalanishdan Oldin Ro'yxatdan O'tish Uchun Saida'loni Soking!"
+        await message.answer(text=text)
+        await RegisterStates.sokish.set()
+
+@dp.message_handler(text="➡️ Keyingi Mahsulotga O'tish")
+async def next_product_handler(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    score = data["score"]
+    score += 1
+    await state.update_data({
+        "score": score
+    })
+    try:
+        mah = cursor.execute(f"SELECT * FROM bozor WHERE id={score}").fetchone()
+        mahsulot = mah[1]
+        narx = mah[2]
+        user = mah[3]
+        desc = mah[4]
+        date = mah[5]
+        status = mah[6]
+        photo = mah[7]
+        likes = mah[-1]
+        await state.update_data({
+            "score": score,
+            "full_name": mahsulot,
+            "price": narx,
+            "username": user,
+            "date": date,
+            "photo": photo,
+            "about": desc
+        })
+        text = f"""
+🪙 Mahsulot: {mahsulot}
+💸 Narxi: {narx}
+👤 Telegram Username: @{user}
+
+‼️ Mahsulot Haqida: <b><b>{desc}</b></b>
+
+📆 Joylangan Sana: {date}
+❗️ Mavjud/Majud Emas: {status}
+❤️ Layklar: {likes}
+"""
+        scores = cursor.execute(f"SELECT likes FROM bozor WHERE full_name='{mahsulot}'").fetchone()
+        await message.answer(text="Mahsulot", reply_markup=next_button)
+        await message.answer_photo(photo=photo, caption=text, reply_markup=await like_button(score=scores[0]))
+    except Exception as exc:
+        print(exc)
+        await message.answer(text="😕 Kechirasiz Mars Bozorda Boshqa Mahsulotlar Mavjud Emas!", reply_markup=user_main_menu)
+        await state.finish()
+
 
 @dp.message_handler(text="🪪 Ro'yxatdan O'tish")
 async def register_handler(message: types.Message):
     text = f"Ismingizni Kiriting: {message.from_user.full_name}"
     await message.answer(text=text, reply_markup=ReplyKeyboardRemove())
     await RegisterStates.full_name.set()
-
-
 
 @dp.message_handler(text="⌨️ Mening Mahsulotlarim")
 async def my_products_handler(message: types.Message):
@@ -286,14 +347,12 @@ async def write_admin_handler(message: types.Message):
     photo = InputFile(path_or_bytesio="../../diyor_zapal.jpg")
     await message.answer_photo(photo=photo, caption=text, reply_markup=write_admin)
 
-
-
 @dp.message_handler(text="🛒 Mahsulot Sotib Olish")
 async def buy_product_handler(message: types.Message):
-    products = cursor.execute(f"SELECT * FROM bozor").fetchall()
     mah = ""
     mahs = list()
     text = ""
+    products = cursor.execute(f"SELECT * FROM bozor").fetchall()
     for productt in products:
         id = productt[0]
         name = productt[1]
@@ -353,7 +412,7 @@ async def add_product(message: types.Message):
     await Add_Product.product_photo.set()
 
 @dp.message_handler(text="🛍 Mening Mahsulotlarim")
-async def my_productss(message: types.Message):
+async def my_productss(message: types.Message, state: FSMContext):
     products = cursor.execute(f"""
     SELECT * FROM products WHERE chat_id={message.chat.id}
     """).fetchall()
@@ -363,9 +422,172 @@ async def my_productss(message: types.Message):
         await message.answer(text=text)
     else:
         for product in products:
+            id = product[0]
             price = product[2]
-            text = f"Narxi: {price}\n\nMahsulot: {product[1]}"
-            await message.answer_photo(photo=product[3], caption=text)
+            text = f"ID Raqami: {id}\n\nNarxi: {price}\n\nMahsulot: {product[1]}"
+            await message.answer_photo(photo=product[3], caption=text, reply_markup=update_delate)
+
+@dp.callback_query_handler(text="del_product")
+async def delate_product(call: types.CallbackQuery, state: FSMContext):
+    text = "😊 Qaysi Mahsulotingizni Ochirmoqchisiz? ID Raqamini Kiriting!"
+    await call.message.answer(text=text, reply_markup=ReplyKeyboardRemove())
+    await IdSearch.delete_id.set()
+
+@dp.message_handler(state=IdSearch.delete_id)
+async def delete_id(message: types.Message, state: FSMContext):
+    try:
+        producttt = cursor.execute(f"SELECT * FROM products WHERE id={int(message.text)}").fetchone()
+        cursor.execute(f"DELETE FROM products WHERE id={producttt[0]}")
+        conn.commit()
+        await message.answer(text="✅ Mahsulotingiz 'Mening Mahsullotlarimdan' Muvaffaqqiyatli Ochirip Tashlandi!", reply_markup=user_main_menu)
+    except Exception as exc:
+        print(exc)
+        await message.answer(text="😕 Kechirasiz Bunday ID Raqamdagi Mahsulotingiz Topilmadi!", reply_markup=user_main_menu)
+    await state.finish()
+@dp.callback_query_handler(text="set_product")
+async def set_product(call: types.CallbackQuery, state: FSMContext):
+    text = "😊 Qaysi Mahsulotingizni Togirlamoqchisiz? ID Raqamini Kiriting!"
+    await call.message.answer(text=text, reply_markup=ReplyKeyboardRemove())
+    await IdSearch.set_product.set()
+
+@dp.callback_query_handler(text="del_bozor_product")
+async def delete_product_handler(call: types.CallbackQuery, state: FSMContext):
+    text = "😊 Qaysi Mahsulotingizni Bozordan Olib Tashlamoqchisiz? ID Raqamini Kiriting!"
+    await call.message.answer(text=text, reply_markup=ReplyKeyboardRemove())
+    await IdSearch.delete_bozor.set()
+
+@dp.message_handler(state=IdSearch.delete_bozor)
+async def delete_bozor(message: types.Message, state: FSMContext):
+    product = cursor.execute(f"SELECT * FROM products WHERE id={int(message.text)}").fetchone()
+    idsi = product[0]
+    mah = product[1]
+    username = product[5]
+    in_not_in = product[-1]
+    if in_not_in == "Bozorda":
+        db_manager.delete_bozor(username=username, mah=mah)
+        text = "✅ Mahsulotingiz Mars Bozordan Muvaffaqqiyatli Ochirip Tashlandi!"
+        await message.answer(text=text, reply_markup=user_main_menu)
+        await state.finish()
+    else:
+        await message.answer(text="😕 Kechirasiz Bu Mahsulotingiz Mars Bozorda Mavjud Emas")
+        await state.finish()
+
+
+
+@dp.message_handler(state=IdSearch.set_product)
+async def set_product(message: types.Message, state: FSMContext):
+    try:
+        product_set = cursor.execute(f"SELECT * FROM products WHERE id={int(message.text)}").fetchone()
+        idsi = product_set[0]
+        mah = product_set[1]
+        price = product_set[2]
+        des = product_set[4]
+        photo = product_set[3]
+        text = f"""
+ID Raqami: {idsi}
+Mahsulotingiz: {mah}
+Narxi: {price}
+Mahsulotingiz Haqida: <b><b>{des}</b></b>
+"""
+        await message.answer(text="Mahsulotingiz", reply_markup=ReplyKeyboardRemove())
+        await message.answer_photo(photo=photo, caption=text, reply_markup=seting)
+        await state.finish()
+        await state.update_data({
+            "id": idsi,
+        })
+    except Exception as exc:
+        print(exc)
+        await message.answer(text="😕 Bunday ID Dagi Mahsulot Topimadi!", reply_markup=user_main_menu)
+        await state.finish()
+
+@dp.callback_query_handler(text="set_name")
+async def set_name(call: types.CallbackQuery, state: FSMContext):
+    text = "😊 Mahsulotingizni Yangi Nomini Kiriting!"
+    await call.message.answer(text=text, reply_markup=ReplyKeyboardRemove())
+    await IdSearch.set_name.set()
+
+@dp.message_handler(state=IdSearch.set_name)
+async def setting_name_handler(message: types.Message, state: FSMContext):
+    await state.update_data({
+        "name_new": message.text
+    })
+    datas = await state.get_data()
+    name = datas['name_new']
+    idsi = datas['id']
+    db_manager.setting_pr(id=idsi, name=name)
+    text = "✅ Mahsulotingiz Nomi Muvaffaqqiyatli Oz'gartirildi!"
+    await message.answer(text=text, reply_markup=user_main_menu)
+    await state.finish()
+
+@dp.callback_query_handler(text="set_price")
+async def set_price_handler(call: types.CallbackQuery, state: FSMContext):
+    text = "😊 Mahsulotingizni Yangi Narxini Kiriting!"
+    await call.message.answer(text=text, reply_markup=ReplyKeyboardRemove())
+    await IdSearch.set_price.set()
+
+@dp.message_handler(state=IdSearch.set_price)
+async def set_price_handler(message: types.Message, state: FSMContext):
+    try:
+        await state.update_data({
+            "new_price": int(message.text)
+        })
+        datalar = await state.get_data()
+        idsi = datalar["id"]
+        price_new = datalar["new_price"]
+        db_manager.setting_price(id=idsi, price=price_new)
+        await message.answer(text="✅Mahsulotingiz Narxi Muvaffaqqiyatli O'zgartirildi!", reply_markup=user_main_menu)
+    except Exception as exc:
+        print(exc)
+        await message.answer(text="❌ Kechirasiz Xatolik Yuz Berdi Yoki Mahsulot Narxini Notogri Kiritdingiz!", reply_markup=user_main_menu)
+    await state.finish()
+
+@dp.callback_query_handler(text="set_desc")
+async def set_desc_handler(call: types.CallbackQuery, state: FSMContext):
+    text = "😊 Mahsulotingiz Haqida Ma'lumot Berishingiz Mumkin!"
+    await call.message.answer(text=text, reply_markup=ReplyKeyboardRemove())
+    await IdSearch.set_desc.set()
+
+@dp.message_handler(state=IdSearch.set_desc)
+async def set_description_handler(message: types.Message, state: FSMContext):
+    try:
+        await state.update_data({
+            "new_desc": message.text
+        })
+        dataa = await state.get_data()
+        idsi = dataa["id"]
+        desc = dataa["new_desc"]
+        db_manager.set_desc(id=idsi, desc=desc)
+        text = "✅ Mahsulotingiz Haqidagi Ma'lumot Muvaffaqqiyatli O'zgartirildi!"
+        await state.finish()
+        await message.answer(text=text, reply_markup=user_main_menu)
+    except Exception as exc:
+        print(exc)
+        await message.answer(text="❌ Kechirasiz Xatolik Yuz Berdi Keyinroq Urinib Ko'ring!", reply_markup=user_main_menu)
+
+@dp.callback_query_handler(text="set_photo")
+async def set_photo(call: types.CallbackQuery, state: FSMContext):
+    text = "😊 Mahsulotingizni Yangi Rasmini Kiriting!"
+    await call.message.answer(text=text, reply_markup=ReplyKeyboardRemove())
+    await IdSearch.set_photo.set()
+
+@dp.message_handler(state=IdSearch.set_photo, content_types=types.ContentType.PHOTO)
+async def set_photo_handleer(message: types.Message, state: FSMContext):
+    try:
+        await state.update_data({
+            "photo": message.photo[-1].file_id
+        })
+        datalarr = await state.get_data()
+        idsi = datalarr["id"]
+        new_photo = datalarr["photo"]
+        db_manager.set_photo(id=idsi, photo=new_photo)
+        text = "✅ Mahsulotingiz Rasmi Muvaffaqqiyatli O'zgartirildi!"
+        await message.answer(text=text, reply_markup=user_main_menu)
+        await state.finish()
+    except Exception as exc:
+        print(exc)
+        await message.answer(text="❌ Kechirasiz Xatolik Yuz Berdi Keyinroq Urinib Ko'ring!")
+        await state.finish()
+
 
 @dp.message_handler(text="🛒 Bozor Tarixi")
 async def history_buys(message: types.Message, state: FSMContext):
@@ -429,6 +651,7 @@ async def bir_mah(call: types.CallbackQuery, state: FSMContext):
     staus = mah[6]
     likes = mah[-1]
     await state.update_data({
+        "score": 1,
         "full_name": full_name,
         "price": price,
         "username": username,
@@ -448,6 +671,7 @@ async def bir_mah(call: types.CallbackQuery, state: FSMContext):
 ❤️ Layklar: {likes}
 """
     score = cursor.execute(f"SELECT likes FROM bozor WHERE full_name='{full_name}'").fetchone()
+    await call.message.answer(text="Mahsulot", reply_markup=next_button)
     await call.message.answer_photo(photo=photo, caption=text, reply_markup=await like_button(score=score[0]))
 
 @dp.callback_query_handler(text="2")
@@ -462,6 +686,7 @@ async def bir_mah(call: types.CallbackQuery, state: FSMContext):
     staus = mah[6]
     likes = mah[-1]
     await state.update_data({
+        "score": 2,
         "full_name": full_name,
         "price": price,
         "username": username,
@@ -481,6 +706,7 @@ async def bir_mah(call: types.CallbackQuery, state: FSMContext):
 ❤️ Layklar: {likes}
 """
     score = cursor.execute(f"SELECT likes FROM bozor WHERE full_name='{full_name}'").fetchone()
+    await call.message.answer(text="Mahsulot", reply_markup=next_button)
     await call.message.answer_photo(photo=photo, caption=text, reply_markup=await like_button(score=score[0]))
 
 @dp.callback_query_handler(text="3")
@@ -495,6 +721,7 @@ async def bir_mah(call: types.CallbackQuery, state: FSMContext):
     staus = mah[6]
     likes = mah[-1]
     await state.update_data({
+        "score": 3,
         "full_name": full_name,
         "price": price,
         "username": username,
@@ -514,6 +741,7 @@ async def bir_mah(call: types.CallbackQuery, state: FSMContext):
 ❤️ Layklar: {likes}
 """
     score = cursor.execute(f"SELECT likes FROM bozor WHERE full_name='{full_name}'").fetchone()
+    await call.message.answer(text="Mahsulot", reply_markup=next_button)
     await call.message.answer_photo(photo=photo, caption=text, reply_markup=await like_button(score=score[0]))
 
 @dp.callback_query_handler(text="4")
@@ -528,6 +756,7 @@ async def bir_mah(call: types.CallbackQuery, state: FSMContext):
     staus = mah[6]
     likes = mah[-1]
     await state.update_data({
+        "score": 4,
         "full_name": full_name,
         "price": price,
         "username": username,
@@ -547,6 +776,7 @@ async def bir_mah(call: types.CallbackQuery, state: FSMContext):
 ❤️ Layklar: {likes}
 """
     score = cursor.execute(f"SELECT likes FROM bozor WHERE full_name='{full_name}'").fetchone()
+    await call.message.answer(text="Mahsulot", reply_markup=next_button)
     await call.message.answer_photo(photo=photo, caption=text, reply_markup=await like_button(score=score[0]))
 
 @dp.callback_query_handler(text="5")
@@ -561,6 +791,7 @@ async def bir_mah(call: types.CallbackQuery, state: FSMContext):
     staus = mah[6]
     likes = mah[-1]
     await state.update_data({
+        "score": 5,
         "full_name": full_name,
         "price": price,
         "username": username,
@@ -580,6 +811,7 @@ async def bir_mah(call: types.CallbackQuery, state: FSMContext):
 ❤️ Layklar: {likes}
 """
     score = cursor.execute(f"SELECT likes FROM bozor WHERE full_name='{full_name}'").fetchone()
+    await call.message.answer(text="Mahsulot", reply_markup=next_button)
     await call.message.answer_photo(photo=photo, caption=text, reply_markup=await like_button(score=score[0]))
 
 @dp.callback_query_handler(text="6")
@@ -594,6 +826,7 @@ async def bir_mah(call: types.CallbackQuery, state: FSMContext):
     staus = mah[6]
     likes = mah[-1]
     await state.update_data({
+        "score": 6,
         "full_name": full_name,
         "price": price,
         "username": username,
@@ -613,6 +846,7 @@ async def bir_mah(call: types.CallbackQuery, state: FSMContext):
 ❤️ Layklar: {likes}
 """
     score = cursor.execute(f"SELECT likes FROM bozor WHERE full_name='{full_name}'").fetchone()
+    await call.message.answer(text="Mahsulot", reply_markup=next_button)
     await call.message.answer_photo(photo=photo, caption=text, reply_markup=await like_button(score=score[0]))
 
 @dp.callback_query_handler(text="admin_hand")
@@ -633,6 +867,7 @@ async def bir_mah(call: types.CallbackQuery, state: FSMContext):
     staus = mah[6]
     likes = mah[-1]
     await state.update_data({
+        "score": 7,
         "full_name": full_name,
         "price": price,
         "username": username,
@@ -652,6 +887,7 @@ async def bir_mah(call: types.CallbackQuery, state: FSMContext):
 ❤️ Layklar: {likes}
 """
     score = cursor.execute(f"SELECT likes FROM bozor WHERE full_name='{full_name}'").fetchone()
+    await call.message.answer(text="Mahsulot", reply_markup=next_button)
     await call.message.answer_photo(photo=photo, caption=text, reply_markup=await like_button(score=score[0]))
 
 @dp.callback_query_handler(text="8")
@@ -666,6 +902,7 @@ async def bir_mah(call: types.CallbackQuery, state: FSMContext):
     staus = mah[6]
     likes = mah[-1]
     await state.update_data({
+        "score": 8,
         "full_name": full_name,
         "price": price,
         "username": username,
@@ -685,6 +922,7 @@ async def bir_mah(call: types.CallbackQuery, state: FSMContext):
 ❤️ Layklar: {likes}
 """
     score = cursor.execute(f"SELECT likes FROM bozor WHERE full_name='{full_name}'").fetchone()
+    await call.message.answer(text="Mahsulot", reply_markup=next_button)
     await call.message.answer_photo(photo=photo, caption=text, reply_markup=await like_button(score=score[0]))
 
 @dp.callback_query_handler(text="9")
@@ -699,6 +937,7 @@ async def bir_mah(call: types.CallbackQuery, state: FSMContext):
     staus = mah[6]
     likes = mah[-1]
     await state.update_data({
+        "score": 9,
         "full_name": full_name,
         "price": price,
         "username": username,
@@ -718,6 +957,7 @@ async def bir_mah(call: types.CallbackQuery, state: FSMContext):
 ❤️ Layklar: {likes}
 """
     score = cursor.execute(f"SELECT likes FROM bozor WHERE full_name='{full_name}'").fetchone()
+    await call.message.answer(text="Mahsulot", reply_markup=next_button)
     await call.message.answer_photo(photo=photo, caption=text, reply_markup=await like_button(score=score[0]))
 
 @dp.callback_query_handler(text="10")
@@ -732,6 +972,7 @@ async def bir_mah(call: types.CallbackQuery, state: FSMContext):
     staus = mah[6]
     likes = mah[-1]
     await state.update_data({
+        "score": 10,
         "full_name": full_name,
         "price": price,
         "username": username,
@@ -751,6 +992,7 @@ async def bir_mah(call: types.CallbackQuery, state: FSMContext):
 ❤️ Layklar: {likes}
 """
     score = cursor.execute(f"SELECT likes FROM bozor WHERE full_name='{full_name}'").fetchone()
+    await call.message.answer(text="Mahsulot", reply_markup=next_button)
     await call.message.answer_photo(photo=photo, caption=text, reply_markup=await like_button(score=score[0]))
 
 @dp.callback_query_handler(text="heart")
@@ -772,7 +1014,8 @@ async def heart_handler(call: types.CallbackQuery, state: FSMContext):
     })
     likee = db_manager.like_or_not(chat_id=call.message.chat.id, data=data)
     if likee:
-        await call.answer(text="❌ Siz Bu Mahsulotga Like Bosgansiz!")
+        await call.message.answer(text="❌ Siz Bu Mahsulotga Like Bosgansiz!", reply_markup=user_main_menu)
+        await call.message.delete()
         await state.finish()
     else:
         db_manager.like_update(data=data)
@@ -850,7 +1093,7 @@ async def search_product_handler(call: types.CallbackQuery, state: FSMContext):
 async def id_buy_product_handler(call: types.CallbackQuery):
     text = "🆔 Sotib Olmoqchi Bolgan Mahsulotingizni ID Raqamini Kiriting!"
     await SearchProuct_id.id_search.set()
-    await call.message.answer(text=text)
+    await call.message.answer(text=text, reply_markup=ReplyKeyboardRemove())
 
 @dp.callback_query_handler(text="id_search_buys")
 async def id_searcch_buys(call: types.CallbackQuery):

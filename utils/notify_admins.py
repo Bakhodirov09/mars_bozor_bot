@@ -12,3 +12,11 @@ async def on_startup_notify(dp: Dispatcher):
 
         except Exception as err:
             logging.exception(err)
+
+async def bot_shutdown(dp: Dispatcher):
+    for admin in ADMINS:
+        try:
+            await dp.bot.send_message(admin, "Bot Toxtadi!")
+
+        except Exception as err:
+            logging.exception(err)

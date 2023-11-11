@@ -60,3 +60,13 @@ cancel = ReplyKeyboardMarkup(
         ]
     ], resize_keyboard=True
 )
+next_button = ReplyKeyboardMarkup(
+    keyboard=[
+        [
+            KeyboardButton(text="➡️ Keyingi Mahsulotga O'tish")
+        ],
+        [
+            KeyboardButton(text="🏘 Asosiy Menyuga Qaytish")
+        ]
+    ], resize_keyboard=True
+)

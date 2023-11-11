@@ -45,7 +45,8 @@ class DatabaseManager:
         product_date TEXT,
         likes INTEGER,
         status TEXT,
-        chat_id INTEGER
+        chat_id INTEGER,
+        in_not_in TEXT
         )
         """)
 
@@ -108,8 +109,8 @@ INSERT INTO users (full_name, phone_number, chat_id, login, password) VALUES (?,
         status = "Mavjud"
         notin = "Bozorda_Emas"
         self.cursor.execute("""
-        INSERT INTO products (product_name, product_price, product_photo, about_product, username, product_date, likes, status, chat_id) VALUES (?,?,?,?,?,?,?,?,?)
-        """, (product_name, price, photo, about, username, date, likes, status, chat_id))
+        INSERT INTO products (product_name, product_price, product_photo, about_product, username, product_date, likes, status, chat_id, in_not_in) VALUES (?,?,?,?,?,?,?,?,?,?)
+        """, (product_name, price, photo, about, username, date, likes, status, chat_id, notin))
 
         self.cursor.execute(f"""
         INSERT INTO '{chat_id}' (product_name, product_price, status, photo, dascription, chat_id, username, datee, in_not_in) VALUES (?,?,?,?,?,?,?,?,?)
@@ -135,6 +136,9 @@ INSERT INTO users (full_name, phone_number, chat_id, login, password) VALUES (?,
         """, (name, price, username, des, date, status, photo, chat_id, likes))
         self.cursor.execute(f"""
         UPDATE '{chat_id}' SET in_not_in='Bozorda' WHERE product_name='{name}'
+        """)
+        self.cursor.execute(f"""
+        UPDATE products SET in_not_in='Bozorda' WHERE product_name='{name}'
         """)
         self.conn.commit()
 
@@ -164,3 +168,29 @@ INSERT INTO users (full_name, phone_number, chat_id, login, password) VALUES (?,
         except Exception as exc:
             print(exc)
             return False
+
+    def delate_product(self, chat_id, id):
+        self.cursor.execute(f"DELETE FROM '{chat_id}' WHERE id={id}")
+        self.conn.commit()
+
+    def setting_pr(self, id, name):
+        self.cursor.execute(f"UPDATE products SET product_name='{name}' WHERE id={id}")
+        self.conn.commit()
+
+    def setting_price(self, id, price):
+        self.cursor.execute(f"UPDATE products SET product_price={int(price)} WHERE id={id}")
+        self.conn.commit()
+
+    def set_desc(self, id, desc):
+        self.cursor.execute(f"UPDATE products SET about_product='{desc}' WHERE id={id}")
+        self.conn.commit()
+
+    def set_photo(self, id, photo):
+        self.cursor.execute(f"UPDATE products SET product_photo='{photo}' WHERE id={id}")
+        self.conn.commit()
+
+    def delete_bozor(self, username, mah):
+        productt = self.cursor.execute(f"SELECT * FROM products WHERE product_name='{mah}' AND username='{username}'").fetchone()
+        self.cursor.execute(f"DELETE FROM bozor WHERE full_name='{productt[1]}' AND username='{productt[5]}'")
+        self.cursor.execute(f"UPDATE products SET in_not_in='Bozorda Emas' WHERE product_name   ='{productt[1]}' AND username='{productt[5]}'")
+        self.conn.commit()

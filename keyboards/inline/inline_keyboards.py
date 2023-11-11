@@ -87,3 +87,37 @@ search_product_id_buys = InlineKeyboardMarkup(
         ]
     ]
 )
+
+update_delate = InlineKeyboardMarkup(
+    inline_keyboard=[
+        [
+            InlineKeyboardButton(text="🛠 Mahsulotni Togirlash", callback_data="set_product"),
+        ],
+        [
+            InlineKeyboardButton(text="❌ Mahsulotni Ochirib Tashlash", callback_data="del_product")
+        ],
+        [
+            InlineKeyboardButton(text="❌ Mahsulotni Bozordan Olib Tashlash", callback_data="del_bozor_product")
+        ]
+    ]
+)
+
+seting = InlineKeyboardMarkup(
+    inline_keyboard=[
+        [
+            InlineKeyboardButton(text="✍️ Mahsulot Nomini Ozgartirish", callback_data="set_name")
+        ],
+        [
+            InlineKeyboardButton(text="💰 Mahsulot Narxini O'zgartirish", callback_data="set_price")
+        ],
+        [
+            InlineKeyboardButton(text="🖨 Mahsulot Haqida Ma'lumot O'zgartirish", callback_data="set_desc")
+        ],
+        [
+            InlineKeyboardButton(text="🖼 Mahsulot Rasmini O'zgartirish", callback_data="set_photo")
+        ],
+        [
+            InlineKeyboardButton(text="🏘 Asosiy Menyu", callback_data="main")
+        ]
+    ]
+)

@@ -6,6 +6,7 @@ class RegisterStates(StatesGroup):
     phone_number = State()
     login = State()
     password = State()
+    sokish = State()
 
 class Add_Product(StatesGroup):
     product_name = State()
@@ -19,6 +20,7 @@ class WriteAdmin(StatesGroup):
 class SaleProduct(StatesGroup):
     select_num = State()
     acept = State()
+    id_search1 = State()
 
 class SearchProduct(StatesGroup):
     search = State()
@@ -28,3 +30,10 @@ class SearchProuct_id(StatesGroup):
 
 class IdSearch(StatesGroup):
     id_searchch = State()
+    delete_id = State()
+    set_product = State()
+    set_name = State()
+    set_price = State()
+    set_desc = State()
+    set_photo = State()
+    delete_bozor = State()
