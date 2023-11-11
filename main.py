@@ -6,7 +6,7 @@ from utils.notify_admins import on_startup_notify, bot_shutdown
 
 app = FastAPI()
 WEBHOOK_PATH=f"/{BOT_TOKEN}/"
-WEBHOOK_URL="https://fake-intsaa.onrender.com"+WEBHOOK_PATH
+WEBHOOK_URL="https://mars-bozor-bot.onrender.com"+WEBHOOK_PATH
 @app.on_event('startup')
 async def on_startup():
     url = await bot.get_webhook_info()
