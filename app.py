@@ -11,7 +11,6 @@ async def on_startup(dispatcher, message: types.Message):
     await set_default_commands(dispatcher)
     # Bot ishga tushgani haqida adminga xabar berish
     await on_startup_notify(dispatcher)
-    db_manager.create_table(chat_id=message.chat.id)
 
 
 if __name__ == '__main__':
