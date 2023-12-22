@@ -344,7 +344,7 @@ async def write_admin_handler(message: types.Message):
 👤 Admin: @bakhodirovv_09
 📩 Pochta: bloghash01@gmail.com
 """
-    photo = InputFile(path_or_bytesio="../../diyor_zapal.jpg")
+    photo = InputFile(path_or_bytesio="./diyor_zapal.jpg")
     await message.answer_photo(photo=photo, caption=text, reply_markup=write_admin)
 
 @dp.message_handler(text="🛒 Mahsulot Sotib Olish")
