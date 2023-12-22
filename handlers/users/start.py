@@ -592,28 +592,32 @@ async def set_photo_handleer(message: types.Message, state: FSMContext):
 @dp.message_handler(text="🛒 Bozor Tarixi")
 async def history_buys(message: types.Message, state: FSMContext):
     buys = cursor.execute(f"SELECT * FROM '{message.chat.id}history_buys'").fetchall()
-    his = list()
-    textt = ""
-    for xbek in buys:
-        id = xbek[0]
-        product_name = xbek[1]
-        dascription = xbek[2]
-        product_price = xbek[3]
-        date = xbek[4]
-        datee = message.date
-        photo = xbek[5]
-        username = xbek[6]
-        userga = f"""
+    if buys:
+        his = list()
+        textt = ""
+        for xbek in buys:
+            id = xbek[0]
+            product_name = xbek[1]
+            dascription = xbek[2]
+            product_price = xbek[3]
+            date = xbek[4]
+            datee = message.date
+            photo = xbek[5]
+            username = xbek[6]
+            userga = f"""
 🆔 {id}
 🛍 Mahsulot: {product_name}
 💰 Narxi: {product_price}
 📆 {datee} da Sotib Olingan
 👤 Mahsulot Egasi: @{username} \n\n
 """
-        his.append(userga)
-    for mee in his:
-        textt += mee
-    await message.answer(text=textt, reply_markup=search_product_id_buys)
+            his.append(userga)
+        for mee in his:
+            textt += mee
+        await message.answer(text=textt, reply_markup=search_product_id_buys)
+    else:
+        text = f"Siz Hali Mars Bozordan Hech Narsa Sotib Olmagansiz!"
+        await message.answer(text=text, reply_markup=user_main_menu)
 
 # callback_query_handlers
 
