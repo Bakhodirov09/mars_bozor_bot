@@ -229,10 +229,19 @@ async def search_product_id_handler(message: types.Message, state: FSMContext):
                 "about": desc
             })
             await message.answer(text=text, reply_markup=next_button)
-            await message.answer_photo(photo=photo, caption=mah, reply_markup=await like_button(score=likes))
+            mahs = cursor.execute(f"SELECT * FROM bozor WHERE id={mah[0] + 1}").fetchone()
+            score = cursor.execute(f"SELECT likes FROM bozor WHERE full_name='{full_name}'").fetchone()
+            if mahs:
+                await message.answer_photo(photo=photo, caption=text,
+                                                reply_markup=await like_button(score=score[0], next=mahs[0],
+                                                                               now=mah[0]))
+            else:
+                await message.answer_photo(photo=photo, caption=text,
+                                                reply_markup=await like_button(score=score[0], next=mah[0], now=mah[0]))
+
         else:
             await message.answer(text="😕 Bunday ID dagi Mahsulot Topilmadi!")
-            await state.finish
+            await state.finish()
     except ValueError:
         await message.answer(text="😕 Bunday ID dagi Mahsulot Topilmadi!")
         await state.finish()
@@ -275,15 +284,74 @@ async def bot_start(message: types.Message):
         await message.answer(text=text)
         await RegisterStates.sokish.set()
 
-@dp.message_handler(text="➡️ Keyingi Mahsulotga O'tish")
-async def next_product_handler(message: types.Message, state: FSMContext):
+@dp.callback_query_handler(text="next")
+async def next_product_handler(call: types.CallbackQuery, state: FSMContext):
+        data = await state.get_data()
+        score = data["score"]
+        score += 1
+        await state.update_data({
+            "score": score
+        })
+        # try:
+        mah = cursor.execute(f"SELECT * FROM bozor WHERE id={score}").fetchone()
+        if mah != None:
+            mahsulot = mah[1]
+            narx = mah[2]
+            user = mah[3]
+            desc = mah[4]
+            date = mah[5]
+            status = mah[6]
+            photo = mah[7]
+            likes = mah[-1]
+            await state.update_data({
+                "score": score,
+                "full_name": mahsulot,
+                "price": narx,
+                "username": user,
+                "date": date,
+                "photo": photo,
+                "about": desc
+            })
+            text = f"""
+🪙 Mahsulot: {mahsulot}
+💸 Narxi: {narx}
+👤 Telegram Username: @{user}
+
+‼️ Mahsulot Haqida: <b><b>{desc}</b></b>
+
+📆 Joylangan Sana: {date}
+❗️ Mavjud/Majud Emas: {status}
+❤️ Layklar: {likes}
+"""
+            await call.message.answer(text="Mahsulot", reply_markup=next_button)
+            mahs = cursor.execute(f"SELECT * FROM bozor WHERE id={mah[0] + 1}").fetchone()
+            score = cursor.execute(f"SELECT likes FROM bozor WHERE full_name='{full_name}'").fetchone()
+            scores = cursor.execute(f"SELECT likes FROM bozor WHERE full_name='{mahsulot}'").fetchone()
+            if mahs:
+                await call.message.answer_photo(photo=photo, caption=text,
+                                                reply_markup=await like_button(score=score[0], next=mahs[0],
+                                                                               now=mah[0]))
+            else:
+                await call.message.answer_photo(photo=photo, caption=text,
+                                                reply_markup=await like_button(score=scores[0], next=mah[0],
+                                                                               now=mah[0]))
+        else:
+            await call.answer(text="😕 Kechirasiz Mars Bozorda Boshqa Mahsulot Qolmadi!", show_alert=True)
+
+    # except Exception as exc:
+    #     print(exc)
+    #     await call.answer(text="😕 Kechirasiz Mars Bozorda Boshqa Mahsulot Qolmadi!", show_alert=True)
+    #     return False
+
+@dp.callback_query_handler(text="left")
+async def left_button_handler(call: types.CallbackQuery, state: FSMContext):
     data = await state.get_data()
     score = data["score"]
-    score += 1
-    await state.update_data({
-        "score": score
-    })
-    try:
+    if score != 1:
+        score -= 1
+        await state.update_data({
+            "score": score
+        })
         mah = cursor.execute(f"SELECT * FROM bozor WHERE id={score}").fetchone()
         mahsulot = mah[1]
         narx = mah[2]
@@ -313,13 +381,13 @@ async def next_product_handler(message: types.Message, state: FSMContext):
 ❗️ Mavjud/Majud Emas: {status}
 ❤️ Layklar: {likes}
 """
+        mahs = cursor.execute(f"SELECT * FROM bozor WHERE id={mah[0] + 1}").fetchone()
         scores = cursor.execute(f"SELECT likes FROM bozor WHERE full_name='{mahsulot}'").fetchone()
-        await message.answer(text="Mahsulot", reply_markup=next_button)
-        await message.answer_photo(photo=photo, caption=text, reply_markup=await like_button(score=scores[0]))
-    except Exception as exc:
-        print(exc)
-        await message.answer(text="😕 Kechirasiz Mars Bozorda Boshqa Mahsulotlar Mavjud Emas!", reply_markup=user_main_menu)
-        await state.finish()
+        await call.message.answer(text="Mahsulot", reply_markup=next_button)
+        if mahs:
+            await call.message.answer_photo(photo=photo, caption=text,reply_markup=await like_button(score=scores[0], next=mahs[0], now=mah[0]))
+    else:
+        await call.answer(text=f"😕 Kechirasiz: {call.from_user.full_name} Bundan Oldin Boshqa Mahsulot Yoq", show_alert=True)
 
 
 @dp.message_handler(text="🪪 Ro'yxatdan O'tish")
@@ -347,12 +415,14 @@ async def write_admin_handler(message: types.Message):
     photo = InputFile(path_or_bytesio="./diyor_zapal.jpg")
     await message.answer_photo(photo=photo, caption=text, reply_markup=write_admin)
 
+
+
 @dp.message_handler(text="🛒 Mahsulot Sotib Olish")
 async def buy_product_handler(message: types.Message):
+    products = cursor.execute(f"SELECT * FROM bozor").fetchall()
     mah = ""
     mahs = list()
     text = ""
-    products = cursor.execute(f"SELECT * FROM bozor").fetchall()
     for productt in products:
         id = productt[0]
         name = productt[1]
@@ -592,8 +662,8 @@ async def set_photo_handleer(message: types.Message, state: FSMContext):
 @dp.message_handler(text="🛒 Bozor Tarixi")
 async def history_buys(message: types.Message, state: FSMContext):
     buys = cursor.execute(f"SELECT * FROM '{message.chat.id}history_buys'").fetchall()
+    his = list()
     if buys:
-        his = list()
         textt = ""
         for xbek in buys:
             id = xbek[0]
@@ -616,8 +686,7 @@ async def history_buys(message: types.Message, state: FSMContext):
             textt += mee
         await message.answer(text=textt, reply_markup=search_product_id_buys)
     else:
-        text = f"Siz Hali Mars Bozordan Hech Narsa Sotib Olmagansiz!"
-        await message.answer(text=text, reply_markup=user_main_menu)
+        await message.answer(text=f"😕 Kechirasiz: {message.from_user.full_name} Siz Hali Mars Bozordan Hech Narsa Sotib Olmagansiz!", reply_markup=user_main_menu)
 
 # callback_query_handlers
 
@@ -676,7 +745,12 @@ async def bir_mah(call: types.CallbackQuery, state: FSMContext):
 """
     score = cursor.execute(f"SELECT likes FROM bozor WHERE full_name='{full_name}'").fetchone()
     await call.message.answer(text="Mahsulot", reply_markup=next_button)
-    await call.message.answer_photo(photo=photo, caption=text, reply_markup=await like_button(score=score[0]))
+    mahs = cursor.execute(f"SELECT * FROM bozor WHERE id={mah[0] + 1}").fetchone()
+    if mahs:
+        await call.message.answer_photo(photo=photo, caption=text, reply_markup=await like_button(score=score[0], next=mahs[0], now=mah[0]))
+    else:
+        await call.message.answer_photo(photo=photo, caption=text, reply_markup=await like_button(score=score[0], next=mah[0], now=mah[0]))
+
 
 @dp.callback_query_handler(text="2")
 async def bir_mah(call: types.CallbackQuery, state: FSMContext):
@@ -711,7 +785,11 @@ async def bir_mah(call: types.CallbackQuery, state: FSMContext):
 """
     score = cursor.execute(f"SELECT likes FROM bozor WHERE full_name='{full_name}'").fetchone()
     await call.message.answer(text="Mahsulot", reply_markup=next_button)
-    await call.message.answer_photo(photo=photo, caption=text, reply_markup=await like_button(score=score[0]))
+    mahs = cursor.execute(f"SELECT * FROM bozor WHERE id={mah[0] + 1}").fetchone()
+    if mahs:
+        await call.message.answer_photo(photo=photo, caption=text, reply_markup=await like_button(score=score[0], next=mahs[0], now=mah[0]))
+    else:
+        await call.message.answer_photo(photo=photo, caption=text, reply_markup=await like_button(score=score[0], next=mah[0], now=mah[0]))
 
 @dp.callback_query_handler(text="3")
 async def bir_mah(call: types.CallbackQuery, state: FSMContext):
@@ -746,7 +824,13 @@ async def bir_mah(call: types.CallbackQuery, state: FSMContext):
 """
     score = cursor.execute(f"SELECT likes FROM bozor WHERE full_name='{full_name}'").fetchone()
     await call.message.answer(text="Mahsulot", reply_markup=next_button)
-    await call.message.answer_photo(photo=photo, caption=text, reply_markup=await like_button(score=score[0]))
+    mahs = cursor.execute(f"SELECT * FROM bozor WHERE id={mah[0] + 1}").fetchone()
+    if mahs:
+        await call.message.answer_photo(photo=photo, caption=text,
+                                        reply_markup=await like_button(score=score[0], next=mahs[0], now=mah[0]))
+    else:
+        await call.message.answer_photo(photo=photo, caption=text,
+                                        reply_markup=await like_button(score=score[0], next=mah[0], now=mah[0]))
 
 @dp.callback_query_handler(text="4")
 async def bir_mah(call: types.CallbackQuery, state: FSMContext):
@@ -781,7 +865,11 @@ async def bir_mah(call: types.CallbackQuery, state: FSMContext):
 """
     score = cursor.execute(f"SELECT likes FROM bozor WHERE full_name='{full_name}'").fetchone()
     await call.message.answer(text="Mahsulot", reply_markup=next_button)
-    await call.message.answer_photo(photo=photo, caption=text, reply_markup=await like_button(score=score[0]))
+    mahs = cursor.execute(f"SELECT * FROM bozor WHERE id={mah[0] + 1}").fetchone()
+    if mahs:
+        await call.message.answer_photo(photo=photo, caption=text, reply_markup=await like_button(score=score[0], next=mahs[0], now=mah[0]))
+    else:
+        await call.message.answer_photo(photo=photo, caption=text, reply_markup=await like_button(score=score[0], next=mah[0], now=mah[0]))
 
 @dp.callback_query_handler(text="5")
 async def bir_mah(call: types.CallbackQuery, state: FSMContext):
@@ -816,7 +904,11 @@ async def bir_mah(call: types.CallbackQuery, state: FSMContext):
 """
     score = cursor.execute(f"SELECT likes FROM bozor WHERE full_name='{full_name}'").fetchone()
     await call.message.answer(text="Mahsulot", reply_markup=next_button)
-    await call.message.answer_photo(photo=photo, caption=text, reply_markup=await like_button(score=score[0]))
+    mahs = cursor.execute(f"SELECT * FROM bozor WHERE id={mah[0] + 1}").fetchone()
+    if mahs:
+        await call.message.answer_photo(photo=photo, caption=text, reply_markup=await like_button(score=score[0], next=mahs[0], now=mah[0]))
+    else:
+        await call.message.answer_photo(photo=photo, caption=text, reply_markup=await like_button(score=score[0], next=mah[0], now=mah[0]))
 
 @dp.callback_query_handler(text="6")
 async def bir_mah(call: types.CallbackQuery, state: FSMContext):
@@ -851,7 +943,11 @@ async def bir_mah(call: types.CallbackQuery, state: FSMContext):
 """
     score = cursor.execute(f"SELECT likes FROM bozor WHERE full_name='{full_name}'").fetchone()
     await call.message.answer(text="Mahsulot", reply_markup=next_button)
-    await call.message.answer_photo(photo=photo, caption=text, reply_markup=await like_button(score=score[0]))
+    mahs = cursor.execute(f"SELECT * FROM bozor WHERE id={mah[0] + 1}").fetchone()
+    if mahs:
+        await call.message.answer_photo(photo=photo, caption=text, reply_markup=await like_button(score=score[0], next=mahs[0], now=mah[0]))
+    else:
+        await call.message.answer_photo(photo=photo, caption=text, reply_markup=await like_button(score=score[0], next=mah[0], now=mah[0]))
 
 @dp.callback_query_handler(text="admin_hand")
 async def admin_write_handler(call: types.CallbackQuery):
@@ -892,7 +988,11 @@ async def bir_mah(call: types.CallbackQuery, state: FSMContext):
 """
     score = cursor.execute(f"SELECT likes FROM bozor WHERE full_name='{full_name}'").fetchone()
     await call.message.answer(text="Mahsulot", reply_markup=next_button)
-    await call.message.answer_photo(photo=photo, caption=text, reply_markup=await like_button(score=score[0]))
+    mahs = cursor.execute(f"SELECT * FROM bozor WHERE id={mah[0] + 1}").fetchone()
+    if mahs:
+        await call.message.answer_photo(photo=photo, caption=text, reply_markup=await like_button(score=score[0], next=mahs[0], now=mah[0]))
+    else:
+        await call.message.answer_photo(photo=photo, caption=text, reply_markup=await like_button(score=score[0], next=mah[0], now=mah[0]))
 
 @dp.callback_query_handler(text="8")
 async def bir_mah(call: types.CallbackQuery, state: FSMContext):
@@ -927,7 +1027,11 @@ async def bir_mah(call: types.CallbackQuery, state: FSMContext):
 """
     score = cursor.execute(f"SELECT likes FROM bozor WHERE full_name='{full_name}'").fetchone()
     await call.message.answer(text="Mahsulot", reply_markup=next_button)
-    await call.message.answer_photo(photo=photo, caption=text, reply_markup=await like_button(score=score[0]))
+    mahs = cursor.execute(f"SELECT * FROM bozor WHERE id={mah[0] + 1}").fetchone()
+    if mahs:
+        await call.message.answer_photo(photo=photo, caption=text, reply_markup=await like_button(score=score[0], next=mahs[0], now=mah[0]))
+    else:
+        await call.message.answer_photo(photo=photo, caption=text, reply_markup=await like_button(score=score[0], next=mah[0], now=mah[0]))
 
 @dp.callback_query_handler(text="9")
 async def bir_mah(call: types.CallbackQuery, state: FSMContext):
@@ -962,7 +1066,11 @@ async def bir_mah(call: types.CallbackQuery, state: FSMContext):
 """
     score = cursor.execute(f"SELECT likes FROM bozor WHERE full_name='{full_name}'").fetchone()
     await call.message.answer(text="Mahsulot", reply_markup=next_button)
-    await call.message.answer_photo(photo=photo, caption=text, reply_markup=await like_button(score=score[0]))
+    mahs = cursor.execute(f"SELECT * FROM bozor WHERE id={mah[0] + 1}").fetchone()
+    if mahs:
+        await call.message.answer_photo(photo=photo, caption=text, reply_markup=await like_button(score=score[0], next=mahs[0], now=mah[0]))
+    else:
+        await call.message.answer_photo(photo=photo, caption=text, reply_markup=await like_button(score=score[0], next=mah[0], now=mah[0]))
 
 @dp.callback_query_handler(text="10")
 async def bir_mah(call: types.CallbackQuery, state: FSMContext):
@@ -997,7 +1105,11 @@ async def bir_mah(call: types.CallbackQuery, state: FSMContext):
 """
     score = cursor.execute(f"SELECT likes FROM bozor WHERE full_name='{full_name}'").fetchone()
     await call.message.answer(text="Mahsulot", reply_markup=next_button)
-    await call.message.answer_photo(photo=photo, caption=text, reply_markup=await like_button(score=score[0]))
+    mahs = cursor.execute(f"SELECT * FROM bozor WHERE id={mah[0] + 1}").fetchone()
+    if mahs:
+        await call.message.answer_photo(photo=photo, caption=text, reply_markup=await like_button(score=score[0], next=mahs[0], now=mah[0]))
+    else:
+        await call.message.answer_photo(photo=photo, caption=text, reply_markup=await like_button(score=score[0], next=mah[0], now=mah[0]))
 
 @dp.callback_query_handler(text="heart")
 async def heart_handler(call: types.CallbackQuery, state: FSMContext):
@@ -1018,8 +1130,7 @@ async def heart_handler(call: types.CallbackQuery, state: FSMContext):
     })
     likee = db_manager.like_or_not(chat_id=call.message.chat.id, data=data)
     if likee:
-        await call.message.answer(text="❌ Siz Bu Mahsulotga Like Bosgansiz!", reply_markup=user_main_menu)
-        await call.message.delete()
+        await call.answer(text="❌ Siz Bu Mahsulotga Like Bosgansiz!")
         await state.finish()
     else:
         db_manager.like_update(data=data)
@@ -1107,5 +1218,3 @@ async def id_searcch_buys(call: types.CallbackQuery):
 
 conn.commit()
 
-if __name__ == "__main__":
-    executor.start_polling(dp, skip_updates=True)
