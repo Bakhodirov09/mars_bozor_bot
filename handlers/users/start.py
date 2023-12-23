@@ -288,12 +288,12 @@ async def bot_start(message: types.Message):
 async def next_product_handler(call: types.CallbackQuery, state: FSMContext):
         data = await state.get_data()
         score = data["score"]
+        # try:
         score += 1
+        mah = cursor.execute(f"SELECT * FROM bozor WHERE id={score}").fetchone()
         await state.update_data({
             "score": score
         })
-        # try:
-        mah = cursor.execute(f"SELECT * FROM bozor WHERE id={score}").fetchone()
         if mah != None:
             mahsulot = mah[1]
             narx = mah[2]
@@ -325,17 +325,20 @@ async def next_product_handler(call: types.CallbackQuery, state: FSMContext):
 """
             await call.message.answer(text="Mahsulot", reply_markup=next_button)
             mahs = cursor.execute(f"SELECT * FROM bozor WHERE id={mah[0] + 1}").fetchone()
-            score = cursor.execute(f"SELECT likes FROM bozor WHERE full_name='{full_name}'").fetchone()
             scores = cursor.execute(f"SELECT likes FROM bozor WHERE full_name='{mahsulot}'").fetchone()
             if mahs:
                 await call.message.answer_photo(photo=photo, caption=text,
-                                                reply_markup=await like_button(score=score[0], next=mahs[0],
+                                                reply_markup=await like_button(score=scores[0], next=mahs[0],
                                                                                now=mah[0]))
             else:
                 await call.message.answer_photo(photo=photo, caption=text,
                                                 reply_markup=await like_button(score=scores[0], next=mah[0],
                                                                                now=mah[0]))
         else:
+            score -= 1
+            await state.update_data({
+                "score": score
+            })
             await call.answer(text="😕 Kechirasiz Mars Bozorda Boshqa Mahsulot Qolmadi!", show_alert=True)
 
     # except Exception as exc:
