@@ -56,7 +56,7 @@ numbers = InlineKeyboardMarkup(
     ]
 )
 
-async def like_button(score):
+async def like_button(score, now, next):
     likes = InlineKeyboardMarkup(
         inline_keyboard=[
             [
@@ -67,10 +67,16 @@ async def like_button(score):
             ],
             [
                 InlineKeyboardButton(text="🏘 Asosiy Menyu", callback_data="main")
+            ],
+            [
+                InlineKeyboardButton(text="⬅️", callback_data="left"),
+                InlineKeyboardButton(text=f"{now} | {next}", callback_data="now"),
+                InlineKeyboardButton(text="➡️", callback_data="next")
             ]
         ]
     )
     return likes
+
 
 search_product_id = InlineKeyboardMarkup(
     inline_keyboard=[
